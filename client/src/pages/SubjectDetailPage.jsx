@@ -14,36 +14,76 @@ import {
 } from 'react-icons/hi';
 
 const SubjectDetailPage = () => {
+
   const { id } = useParams();
   const { isAdmin } = useAuth();
+
   const [subject, setSubject] = useState(null);
   const [topics, setTopics] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Create
   const [showCreate, setShowCreate] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Edit
   const [editTopic, setEditTopic] = useState(null);
   const [editTitle, setEditTitle] = useState('');
 
-  // Delete
   const [deleteTarget, setDeleteTarget] = useState(null);
 
   useEffect(() => {
     fetchData();
   }, [id]);
 
+  // 🔥 UPDATED FETCH WITH COUNTS + LAST SAVED DATE
   const fetchData = async () => {
     try {
       const [subRes, topRes] = await Promise.all([
         api.get(`/subjects/${id}`),
         api.get(`/topics?subjectId=${id}`),
       ]);
+
+      const topicsWithCounts = await Promise.all(
+        topRes.data.map(async (topic) => {
+          try {
+            const mat = await api.get(`/materials?topicId=${topic._id}`);
+            const materials = mat.data || [];
+
+            const notes = materials.filter(m => m.type === 'note').length;
+            const files = materials.filter(m => m.type === 'file').length;
+            const videos = materials.filter(m => m.type === 'video').length;
+
+            let latestDate = topic.createdAt;
+
+            if (materials.length > 0) {
+              latestDate = materials
+                .map(m => new Date(m.createdAt))
+                .sort((a,b)=>b-a)[0];
+            }
+
+            return {
+              ...topic,
+              notes,
+              files,
+              videos,
+              latestDate
+            };
+
+          } catch {
+            return {
+              ...topic,
+              notes:0,
+              files:0,
+              videos:0,
+              latestDate:topic.createdAt
+            };
+          }
+        })
+      );
+
       setSubject(subRes.data);
-      setTopics(topRes.data);
+      setTopics(topicsWithCounts);
+
     } catch {
       toast.error('Failed to load subject');
     } finally {
@@ -98,11 +138,13 @@ const SubjectDetailPage = () => {
 
   return (
     <div className="space-y-6">
-      {/* Breadcrumb / Header */}
+
+      {/* HEADER */}
       <div>
         <Link to="/subjects" className="inline-flex items-center gap-1 text-sm text-indigo-600 hover:underline mb-3">
           <HiOutlineArrowLeft size={16} /> Back to Subjects
         </Link>
+
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-800">{subject.title}</h1>
@@ -110,6 +152,7 @@ const SubjectDetailPage = () => {
               <p className="text-gray-500 text-sm mt-1">{subject.description}</p>
             )}
           </div>
+
           {isAdmin && (
             <button
               onClick={() => setShowCreate(true)}
@@ -122,125 +165,144 @@ const SubjectDetailPage = () => {
         </div>
       </div>
 
-      {/* Topics List */}
+      {/* TOPIC GRID */}
       {topics.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
           <HiOutlineFolder size={48} className="mx-auto text-gray-300" />
           <p className="text-gray-500 mt-3">No topics yet</p>
-          {isAdmin && (
-            <button onClick={() => setShowCreate(true)} className="mt-4 text-indigo-600 text-sm font-medium hover:underline">
-              Add the first topic
-            </button>
-          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
           {topics.map((topic) => (
+
             <div
               key={topic._id}
               className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition group relative"
             >
+
               <Link to={`/topics/${topic._id}`} className="block">
+
                 <div className="flex items-center gap-3">
+
                   <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center flex-shrink-0">
                     <HiOutlineFolder size={20} className="text-indigo-600" />
                   </div>
+
                   <div>
                     <h3 className="font-semibold text-gray-800 group-hover:text-indigo-600 transition">
                       {topic.title}
                     </h3>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {new Date(topic.createdAt).toLocaleDateString()}
+
+                    {/* COUNTS */}
+                    <p className="text-xs text-gray-500 mt-1">
+                      📝 {topic.notes} Notes · 📂 {topic.files} Files · 🎥 {topic.videos} Videos
                     </p>
+
+                    {/* LAST SAVED DATE */}
+                    <p className="text-xs text-gray-400 mt-1">
+                      📅 Last updated: {new Date(topic.latestDate).toLocaleDateString()}
+                    </p>
+
                   </div>
                 </div>
+
               </Link>
+
               {isAdmin && (
                 <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition">
+
                   <button
                     onClick={() => { setEditTopic(topic); setEditTitle(topic.title); }}
                     className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500"
-                    title="Rename"
                   >
-                    <HiOutlinePencil size={16} />
+                    <HiOutlinePencil size={16}/>
                   </button>
+
                   <button
                     onClick={() => setDeleteTarget(topic)}
                     className="p-1.5 rounded-lg hover:bg-red-50 text-red-500"
-                    title="Delete"
                   >
-                    <HiOutlineTrash size={16} />
+                    <HiOutlineTrash size={16}/>
                   </button>
+
                 </div>
               )}
+
             </div>
+
           ))}
+
         </div>
       )}
 
-      {/* Create Modal */}
+      {/* CREATE MODAL */}
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Add Topic</h3>
+            <h3 className="text-lg font-semibold mb-4">Add Topic</h3>
+
             <form onSubmit={handleCreate} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Topic Title</label>
-                <input
-                  type="text"
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  required
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm"
-                  placeholder="e.g. Chapter 1 - Introduction"
-                />
-              </div>
+
+              <input
+                type="text"
+                value={newTitle}
+                onChange={(e)=>setNewTitle(e.target.value)}
+                required
+                className="w-full px-4 py-2 border rounded-lg"
+                placeholder="Module name"
+              />
+
               <div className="flex justify-end gap-3">
-                <button type="button" onClick={() => setShowCreate(false)} className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">Cancel</button>
-                <button type="submit" disabled={saving} className="px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50">
+                <button type="button" onClick={()=>setShowCreate(false)} className="px-4 py-2 border rounded-lg">Cancel</button>
+                <button type="submit" disabled={saving} className="px-4 py-2 bg-indigo-600 text-white rounded-lg">
                   {saving ? 'Creating...' : 'Create'}
                 </button>
               </div>
+
             </form>
           </div>
         </div>
       )}
 
-      {/* Edit Modal */}
+      {/* EDIT MODAL */}
       {editTopic && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Rename Topic</h3>
+
+            <h3 className="text-lg font-semibold mb-4">Rename Topic</h3>
+
             <form onSubmit={handleEdit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
-                <input
-                  type="text"
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  required
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm"
-                />
-              </div>
+
+              <input
+                type="text"
+                value={editTitle}
+                onChange={(e)=>setEditTitle(e.target.value)}
+                required
+                className="w-full px-4 py-2 border rounded-lg"
+              />
+
               <div className="flex justify-end gap-3">
-                <button type="button" onClick={() => setEditTopic(null)} className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">Cancel</button>
-                <button type="submit" disabled={saving} className="px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50">
+                <button type="button" onClick={()=>setEditTopic(null)} className="px-4 py-2 border rounded-lg">Cancel</button>
+                <button type="submit" disabled={saving} className="px-4 py-2 bg-indigo-600 text-white rounded-lg">
                   {saving ? 'Saving...' : 'Save'}
                 </button>
               </div>
+
             </form>
           </div>
         </div>
       )}
 
-      {/* Delete Confirm */}
+      {/* DELETE MODAL */}
       <ConfirmModal
         open={!!deleteTarget}
         title="Delete Topic"
-        message={`Delete "${deleteTarget?.title}"? All notes, files, and videos inside will be removed.`}
+        message={`Delete "${deleteTarget?.title}"?`}
         onConfirm={handleDelete}
-        onCancel={() => setDeleteTarget(null)}
+        onCancel={()=>setDeleteTarget(null)}
       />
+
     </div>
   );
 };
