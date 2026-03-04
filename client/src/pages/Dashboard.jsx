@@ -4,12 +4,13 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 import LoadingSpinner from '../components/LoadingSpinner';
 import toast from 'react-hot-toast';
-import { HiOutlinePlus, HiOutlineBookOpen, HiOutlineSpeakerphone } from 'react-icons/hi';
+import { HiOutlinePlus, HiOutlineBookOpen, HiOutlineSpeakerphone, HiOutlineLightningBolt } from 'react-icons/hi';
 
 const Dashboard = () => {
   const { user, isAdmin } = useAuth();
   const [subjects, setSubjects] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
+  const [updates, setUpdates] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Modal state for creating subject
@@ -21,18 +22,36 @@ const Dashboard = () => {
   const [showCreateAnnouncement, setShowCreateAnnouncement] = useState(false);
   const [newAnnouncement, setNewAnnouncement] = useState({ title: '', message: '' });
 
+  // Format relative time
+  const formatTimeAgo = (dateStr) => {
+    const now = new Date();
+    const date = new Date(dateStr);
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} min ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
 
   const fetchData = async () => {
     try {
-      const [subRes, annRes] = await Promise.all([
+      const [subRes, annRes, updRes] = await Promise.all([
         api.get('/subjects'),
         api.get('/announcements'),
+        api.get('/updates'),
       ]);
       setSubjects(subRes.data);
       setAnnouncements(annRes.data);
+      setUpdates(updRes.data);
     } catch (err) {
       toast.error('Failed to load data');
     } finally {
@@ -126,6 +145,35 @@ const Dashboard = () => {
                 </p>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Latest Updates Panel */}
+      {updates.length > 0 && (
+        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-5">
+          <h2 className="text-lg font-semibold text-indigo-800 flex items-center gap-2 mb-3">
+            <HiOutlineLightningBolt size={20} />
+            Latest Updates
+          </h2>
+          <div className="space-y-2">
+            {updates.map((upd) => {
+              const icon = upd.type === 'file' ? '📄' : upd.type === 'video' ? '🎥' : '📝';
+              const timeAgo = formatTimeAgo(upd.createdAt);
+              return (
+                <div key={upd._id} className="bg-white rounded-lg p-3 border border-indigo-100 flex items-start gap-3">
+                  <span className="text-lg leading-none mt-0.5">{icon}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-800 truncate">{upd.title}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {upd.topicId?.title && <span>{upd.topicId.title}</span>}
+                      {upd.subjectId?.title && <span className="text-gray-400"> · {upd.subjectId.title}</span>}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">{timeAgo}</p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
