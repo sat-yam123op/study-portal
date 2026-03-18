@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 
 
-// ─── Helper: get or create material for a topic ───
+// --- Helper: get or create material for a topic ---
 const getOrCreateMaterial = async (topicId) => {
   let material = await Material.findOne({ topicId });
   if (!material) {
@@ -15,7 +15,7 @@ const getOrCreateMaterial = async (topicId) => {
 };
 
 
-// ─── Helper: create update record ───
+// --- Helper: create update record ---
 const createUpdate = async (type, title, topicId) => {
   try {
     const topic = await Topic.findById(topicId).select('subjectId title');
@@ -50,18 +50,73 @@ const createUpdate = async (type, title, topicId) => {
 };
 
 
-// ─── GET /api/materials/:topicId ─── Fetch all content
+// --- GET /api/materials/:topicId --- Fetch all content
 const getMaterial = async (req, res, next) => {
   try {
     const material = await getOrCreateMaterial(req.params.topicId);
-    res.json(material);
+    const payload = material.toObject();
+
+    // Never expose all students' private notes through this shared payload.
+    delete payload.studentNotes;
+
+    res.json(payload);
   } catch (error) {
     next(error);
   }
 };
 
 
-// ─── PUT /api/materials/:topicId/notes ─── Add/update notes
+// --- GET /api/materials/:topicId/student-notes --- Fetch current student's private notes
+const getStudentNotes = async (req, res, next) => {
+  try {
+    const material = await getOrCreateMaterial(req.params.topicId);
+
+    const note = material.studentNotes.find(
+      (n) => n.userId && n.userId.toString() === req.user.id
+    );
+
+    res.json({ content: note?.content || '', updatedAt: note?.updatedAt || null });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+// --- PUT /api/materials/:topicId/student-notes --- Create/update current student's private notes
+const updateStudentNotes = async (req, res, next) => {
+  try {
+    const { content = '' } = req.body;
+    const material = await getOrCreateMaterial(req.params.topicId);
+
+    const note = material.studentNotes.find(
+      (n) => n.userId && n.userId.toString() === req.user.id
+    );
+
+    if (note) {
+      note.content = content;
+      note.updatedAt = new Date();
+    } else {
+      material.studentNotes.push({
+        userId: req.user.id,
+        content,
+        updatedAt: new Date(),
+      });
+    }
+
+    await material.save();
+
+    const saved = material.studentNotes.find(
+      (n) => n.userId && n.userId.toString() === req.user.id
+    );
+
+    res.json({ content: saved?.content || '', updatedAt: saved?.updatedAt || null });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+// --- PUT /api/materials/:topicId/notes --- Add/update notes
 const updateNotes = async (req, res, next) => {
   try {
     const { notes } = req.body;
@@ -81,17 +136,15 @@ const updateNotes = async (req, res, next) => {
     );
 
     res.json(material);
-
   } catch (error) {
     next(error);
   }
 };
 
 
-// ─── POST /api/materials/:topicId/files ─── Upload file
+// --- POST /api/materials/:topicId/files --- Upload file
 const uploadFile = async (req, res, next) => {
   try {
-
     if (!req.file) {
       return res.status(400).json({ message: 'No file uploaded' });
     }
@@ -110,23 +163,21 @@ const uploadFile = async (req, res, next) => {
 
     // NEW: create update log
     await createUpdate(
-      "file",
+      'file',
       `${req.file.originalname} uploaded`,
       req.params.topicId
     );
 
     res.status(201).json(material);
-
   } catch (error) {
     next(error);
   }
 };
 
 
-// ─── DELETE /api/materials/:topicId/files/:fileId ─── Remove file
+// --- DELETE /api/materials/:topicId/files/:fileId --- Remove file
 const deleteFile = async (req, res, next) => {
   try {
-
     const material = await Material.findOne({ topicId: req.params.topicId });
 
     if (!material) {
@@ -150,17 +201,15 @@ const deleteFile = async (req, res, next) => {
     await material.save();
 
     res.json({ message: 'File deleted', material });
-
   } catch (error) {
     next(error);
   }
 };
 
 
-// ─── POST /api/materials/:topicId/videos ─── Add YouTube link
+// --- POST /api/materials/:topicId/videos --- Add YouTube link
 const addVideo = async (req, res, next) => {
   try {
-
     const { title, url, description } = req.body;
 
     if (!title || !url) {
@@ -178,30 +227,28 @@ const addVideo = async (req, res, next) => {
     material.videos.push({
       title,
       url,
-      description
+      description,
     });
 
     await material.save();
 
     // NEW: create update log
     await createUpdate(
-      "video",
+      'video',
       `Video added: ${title}`,
       req.params.topicId
     );
 
     res.status(201).json(material);
-
   } catch (error) {
     next(error);
   }
 };
 
 
-// ─── DELETE /api/materials/:topicId/videos/:videoId ───
+// --- DELETE /api/materials/:topicId/videos/:videoId ---
 const deleteVideo = async (req, res, next) => {
   try {
-
     const material = await Material.findOne({ topicId: req.params.topicId });
 
     if (!material) {
@@ -213,7 +260,6 @@ const deleteVideo = async (req, res, next) => {
     await material.save();
 
     res.json({ message: 'Video removed', material });
-
   } catch (error) {
     next(error);
   }
@@ -222,6 +268,8 @@ const deleteVideo = async (req, res, next) => {
 
 module.exports = {
   getMaterial,
+  getStudentNotes,
+  updateStudentNotes,
   updateNotes,
   uploadFile,
   deleteFile,

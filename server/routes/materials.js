@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const {
   getMaterial,
+  getStudentNotes,
+  updateStudentNotes,
   updateNotes,
   uploadFile,
   deleteFile,
@@ -16,6 +18,10 @@ router.get('/:topicId', protect, getMaterial);
 
 // Update notes (admin only)
 router.put('/:topicId/notes', protect, authorize('admin'), updateNotes);
+
+// Student personal notes (student only)
+router.get('/:topicId/student-notes', protect, authorize('student'), getStudentNotes);
+router.put('/:topicId/student-notes', protect, authorize('student'), updateStudentNotes);
 
 // Upload file (admin only)
 router.post(

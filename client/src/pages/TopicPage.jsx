@@ -51,6 +51,8 @@ const TopicPage = () => {
 
   const [notes, setNotes] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
+  const [studentNotes, setStudentNotes] = useState('');
+  const [savingStudentNotes, setSavingStudentNotes] = useState(false);
 
   const [uploading, setUploading] = useState(false);
 
@@ -62,7 +64,7 @@ const TopicPage = () => {
 
   useEffect(() => {
     fetchData();
-  }, [id]);
+  }, [id, isAdmin]);
 
   const fetchData = async () => {
     try {
@@ -73,6 +75,11 @@ const TopicPage = () => {
       setTopic(topicRes.data);
       setMaterial(matRes.data);
       setNotes(matRes.data.notes || '');
+
+      if (!isAdmin) {
+        const studentNoteRes = await api.get(`/materials/${id}/student-notes`);
+        setStudentNotes(studentNoteRes.data?.content || '');
+      }
     } catch {
       toast.error('Failed to load topic');
     } finally {
@@ -89,6 +96,18 @@ const TopicPage = () => {
       toast.error('Failed to save notes');
     } finally {
       setSavingNotes(false);
+    }
+  };
+
+  const handleSaveStudentNotes = async () => {
+    setSavingStudentNotes(true);
+    try {
+      await api.put(`/materials/${id}/student-notes`, { content: studentNotes });
+      toast.success('Personal notes saved!');
+    } catch {
+      toast.error('Failed to save personal notes');
+    } finally {
+      setSavingStudentNotes(false);
     }
   };
 
@@ -294,34 +313,65 @@ const TopicPage = () => {
       {/* NOTES TAB */}
       {activeTab === 'notes' && (
         <div className="space-y-4">
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
-            {isAdmin ? (
-              <>
-                <ReactQuill
-                  value={notes}
-                  onChange={setNotes}
-                  theme="snow"
-                  placeholder="Write your notes here..."
-                  className="bg-white"
+          <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">📘 Admin Notes</h3>
+
+              {isAdmin ? (
+                <>
+                  <ReactQuill
+                    value={notes}
+                    onChange={setNotes}
+                    theme="snow"
+                    placeholder="Write your notes here..."
+                    className="bg-white"
+                  />
+                  <div className="flex justify-end mt-3">
+                    <button
+                      onClick={handleSaveNotes}
+                      disabled={savingNotes}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition"
+                    >
+                      <HiOutlineSave size={16} />
+                      {savingNotes ? 'Saving...' : 'Save Notes'}
+                    </button>
+                  </div>
+                </>
+              ) : notes ? (
+                <div
+                  className="prose prose-sm max-w-none"
+                  dangerouslySetInnerHTML={{ __html: notes }}
                 />
-                <div className="flex justify-end mt-3">
-                  <button
-                    onClick={handleSaveNotes}
-                    disabled={savingNotes}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition"
-                  >
-                    <HiOutlineSave size={16} />
-                    {savingNotes ? 'Saving...' : 'Save Notes'}
-                  </button>
+              ) : (
+                <p className="text-gray-400 text-sm">No admin notes available yet.</p>
+              )}
+            </div>
+
+            {!isAdmin && (
+              <>
+                <div className="border-t border-gray-200" />
+
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">📝 Your Personal Notes</h3>
+                  <ReactQuill
+                    value={studentNotes}
+                    onChange={setStudentNotes}
+                    theme="snow"
+                    placeholder="Write your personal notes here..."
+                    className="bg-white"
+                  />
+                  <div className="flex justify-end mt-3">
+                    <button
+                      onClick={handleSaveStudentNotes}
+                      disabled={savingStudentNotes}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition"
+                    >
+                      <HiOutlineSave size={16} />
+                      {savingStudentNotes ? 'Saving...' : 'Save Personal Notes'}
+                    </button>
+                  </div>
                 </div>
               </>
-            ) : notes ? (
-              <div
-                className="prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: notes }}
-              />
-            ) : (
-              <p className="text-gray-400 text-sm text-center py-8">No notes available yet.</p>
             )}
           </div>
         </div>

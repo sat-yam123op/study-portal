@@ -15,6 +15,24 @@ const materialSchema = new mongoose.Schema(
       default: '',
     },
 
+    // Private notes per student (one entry per user per topic)
+    studentNotes: [
+      {
+        userId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+        },
+        content: {
+          type: String,
+          default: '',
+        },
+        updatedAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
+
     // Uploaded files (pdf, images, docs)
     files: [
       {
