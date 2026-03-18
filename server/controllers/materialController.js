@@ -25,11 +25,23 @@ const createUpdate = async (type, title, topicId) => {
       return;
     }
 
+    // Prevent duplicate update spam within 5 minutes for same title/topic pair
+    const existing = await Update.findOne({
+      title,
+      topicId,
+      createdAt: { $gt: new Date(Date.now() - 5 * 60 * 1000) },
+    });
+
+    if (existing) {
+      return;
+    }
+
     await Update.create({
       type,
       title,
       topicId,
       subjectId: topic.subjectId,
+      createdAt: new Date(),
     });
   } catch (err) {
     // Log the full error so issues are visible during development
@@ -63,7 +75,7 @@ const updateNotes = async (req, res, next) => {
     // NEW: create update log (include topic name for context)
     const topic = await Topic.findById(req.params.topicId).select('title');
     await createUpdate(
-      'note',
+      'notes',
       `Notes updated: ${topic?.title || 'Unknown topic'}`,
       req.params.topicId
     );
@@ -99,7 +111,7 @@ const uploadFile = async (req, res, next) => {
     // NEW: create update log
     await createUpdate(
       "file",
-      req.file.originalname,
+      `${req.file.originalname} uploaded`,
       req.params.topicId
     );
 
@@ -174,7 +186,7 @@ const addVideo = async (req, res, next) => {
     // NEW: create update log
     await createUpdate(
       "video",
-      title,
+      `Video added: ${title}`,
       req.params.topicId
     );
 

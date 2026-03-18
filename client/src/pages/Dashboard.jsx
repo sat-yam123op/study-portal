@@ -38,6 +38,13 @@ const Dashboard = () => {
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
+  const getUpdateIcon = (type) => {
+    if (type === 'file') return '📄';
+    if (type === 'video') return '🎥';
+    if (type === 'notes' || type === 'note') return '📝';
+    return '📝';
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -157,17 +164,17 @@ const Dashboard = () => {
             Latest Updates
           </h2>
           <div className="space-y-2">
-            {updates.map((upd) => {
-              const icon = upd.type === 'file' ? '📄' : upd.type === 'video' ? '🎥' : '📝';
+            {updates.slice(0, 10).map((upd) => {
+              const icon = getUpdateIcon(upd.type);
               const timeAgo = formatTimeAgo(upd.createdAt);
               return (
                 <div key={upd._id} className="bg-white rounded-lg p-3 border border-indigo-100 flex items-start gap-3">
                   <span className="text-lg leading-none mt-0.5">{icon}</span>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-gray-800 truncate">{upd.title}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {upd.topicId?.title && <span>{upd.topicId.title}</span>}
-                      {upd.subjectId?.title && <span className="text-gray-400"> · {upd.subjectId.title}</span>}
+                    <p className="text-xs text-gray-500 mt-0.5 truncate">
+                      {upd.topicId?.title || 'Unknown topic'}
+                      <span className="text-gray-400"> · {upd.subjectId?.title || 'Unknown subject'}</span>
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5">{timeAgo}</p>
                   </div>

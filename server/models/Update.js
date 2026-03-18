@@ -4,7 +4,7 @@ const updateSchema = new mongoose.Schema(
   {
     type: {
       type: String,
-      enum: ['file', 'note', 'video', 'topic'],
+      enum: ['file', 'notes', 'video', 'topic'],
       required: true,
     },
 
@@ -28,5 +28,8 @@ const updateSchema = new mongoose.Schema(
 
 // Index for fast "latest updates" query
 updateSchema.index({ createdAt: -1 });
+
+// Auto-expire updates after 24 hours
+updateSchema.index({ createdAt: 1 }, { expireAfterSeconds: 86400 });
 
 module.exports = mongoose.model('Update', updateSchema);
